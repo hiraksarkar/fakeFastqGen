@@ -12,7 +12,8 @@
 void createFastqFiles(std::string fastaFile,
                       std::string outdir,
                       bool isPairedEnd,
-                      uint32_t readLen){
+                      uint32_t readLen,
+                      bool ignoreShortSeq){
   {
     ScopedTimer st ;
     std::vector<std::string> read_file = {fastaFile} ;
@@ -79,6 +80,8 @@ void createFastqFiles(std::string fastaFile,
           }
 
         }else{
+          if(ignoreShortSeq)
+            continue ;
 
           std::string padstr(readLen - r1.length(),'N') ;
           std::string readStr = r1+padstr ;
@@ -126,6 +129,7 @@ int main(int argc, char* argv[]){
   std::string outdir ;
   std::string fastaFile ;
   bool isPairedEnd{false} ;
+  bool ignoreShortSeq{true} ;
   //end
 
   fastaqApp
@@ -138,6 +142,10 @@ int main(int argc, char* argv[]){
 
   fastaqApp
     ->add_flag("-p,--paireend", isPairedEnd,
+               "library type");
+
+  fastaqApp
+    ->add_flag("-i,--ignore", ignoreShortSeq,
                "library type");
   //fastaqApp
   //->add_flag("-p,--library", isPairedEnd, "paired end or not") ;
@@ -153,7 +161,7 @@ int main(int argc, char* argv[]){
   }
 
   if(app.got_subcommand(fastaqApp)){
-    createFastqFiles(fastaFile, outdir, isPairedEnd, readLen) ;
+    createFastqFiles(fastaFile, outdir, isPairedEnd, readLen, ignoreShortSeq) ;
   }else{
     std::cerr << "wrong subcommand\n" ;
   }
