@@ -3,6 +3,8 @@
 #include "string_view.hpp"
 #include "FileOps.hpp"
 #include "ScopedTimer.hpp"
+#include "CanonicalKmer.hpp"
+#include "CanonicalKmerIterator.hpp"
 #include <cmath>
 #include <iterator>
 #include <iostream>
@@ -14,6 +16,7 @@ void createFastqFiles(std::string fastaFile,
                       bool isPairedEnd,
                       uint32_t readLen,
                       bool ignoreShortSeq){
+  
   {
     ScopedTimer st ;
     std::vector<std::string> read_file = {fastaFile} ;
@@ -34,7 +37,8 @@ void createFastqFiles(std::string fastaFile,
       fastqFile_2.open(outdir + "/2.fq") ;
     }
 
-   
+    CanonicalKmer::k(readLen) ;
+    pufferfish::CanonicalKmerIterator kit_end ;
 
     size_t globalId{0};
     size_t rn{0} ;
@@ -46,29 +50,42 @@ void createFastqFiles(std::string fastaFile,
           std::cerr << "rn: "<<rn << "\n" ;
         }
         ++rn ;
+
+
         auto& r1 = rp.seq ;
         auto& name = rp.name ;
 
+        
         stx::string_view r1view(r1) ;
 
         if(r1.length() > readLen){
+          pufferfish::CanonicalKmerIterator kit1(r1) ;
           if(!isPairedEnd){
-            size_t index{0} ;
-            for(;index < (r1view.size()-readLen+1);++index){
+
+            for(; kit1 != kit_end ; ++kit1){
               fastqFile << "@"<<name<<"_"<<globalId<<"\n" ;
-              fastqFile << r1view.substr(index,readLen) << "\n";
+              fastqFile << kit1->first.to_str() << "\n";
               fastqFile << "+" << "\n" ;
               std::string quality(readLen,'I') ;
               fastqFile << quality << "\n" ;
               ++globalId ;
             }
+
           }else{
-            size_t index{0} ;
-            for(;index < (r1view.size()-readLen);++index){
+            for(; kit1 != kit_end ; ){
+              auto kit2 = kit1 ;
+              fastqFile << "@"<<name<<"_"<<globalId<<"\n" ;
               fastqFile_1 <<"@"<<name<<"_"<<globalId<<"/1\n" ;
               fastqFile_2 <<"@"<<name<<"_"<<globalId<<"/2\n" ;
-              fastqFile_1 << r1view.substr(index,readLen) << "\n";
-              fastqFile_2 << r1view.substr(index+1,readLen) << "\n";
+              fastqFile_1 << kit1->first.to_str() << "\n";
+              ++kit1;
+              if(kit1 != kit_end){
+                fastqFile_2 << kit1->first.to_str() << "\n";
+                ++kit1 ;
+              }else{
+                fastqFile_2 << kit2->first.to_str() << "\n";
+                break ;
+              }
               fastqFile_1 << "+" << "\n" ;
               fastqFile_2 << "+" << "\n" ;
               std::string quality(readLen,'I') ;
@@ -106,6 +123,7 @@ void createFastqFiles(std::string fastaFile,
               ++globalId ;
           }
         }
+        
 
       }
     }
@@ -116,7 +134,7 @@ void createFastqFiles(std::string fastaFile,
       fastqFile_1.close() ;
       fastqFile_2.close() ;
     }
-  }
+    }
 }
 
 
