@@ -13,19 +13,21 @@ void createFastqFiles(std::string fastaFile,
                       std::string outdir,
                       bool isPairedEnd,
                       uint32_t readLen,
-                      bool ignoreShortSeq){
+                      bool ignoreShortSeq,
+                      size_t fileSize){
   {
-    ScopedTimer st ;
+    //ScopedTimer st ;
     std::vector<std::string> read_file = {fastaFile} ;
     fastx_parser::FastxParser<fastx_parser::ReadSeq> parser(read_file, 1, 1) ;
     parser.start() ;
 
 
+    std::cerr<< "\n Num of line is fastq " << fileSize << "\n" ;
     if(outdir.back() == '/')
       outdir.pop_back() ;
 
     MakeDir(outdir.c_str()) ;
-    
+
     std::ofstream fastqFile, fastqFile_1, fastqFile_2;
     if(!isPairedEnd){
       fastqFile.open(outdir + "/1.fq") ;
@@ -34,7 +36,7 @@ void createFastqFiles(std::string fastaFile,
       fastqFile_2.open(outdir + "/2.fq") ;
     }
 
-   
+
 
     size_t globalId{0};
     size_t rn{0} ;
@@ -45,7 +47,16 @@ void createFastqFiles(std::string fastaFile,
         if(rn % 5000 == 0){
           std::cerr << "rn: "<<rn << "\n" ;
         }
+
+        if(globalId % 5000 == 0){
+          std::cerr << "globalId: "<<globalId << "\n" ;
+        }
+
+
         ++rn ;
+        if(rn > fileSize){
+            break ;
+        }
         auto& r1 = rp.seq ;
         auto& name = rp.name ;
 
@@ -64,7 +75,11 @@ void createFastqFiles(std::string fastaFile,
             }
           }else{
             size_t index{0} ;
-            for(;index < (r1view.size()-readLen);++index){
+            for(;index < (r1view.size()-readLen+1);index+=2){
+              //std::cerr << "\n this is slow " << index << " rn: " << rn << "\n" ;
+              if(index + readLen >= r1view.size()){
+                  break ;
+              }
               fastqFile_1 <<"@"<<name<<"_"<<globalId<<"/1\n" ;
               fastqFile_2 <<"@"<<name<<"_"<<globalId<<"/2\n" ;
               fastqFile_1 << r1view.substr(index,readLen) << "\n";
@@ -76,7 +91,7 @@ void createFastqFiles(std::string fastaFile,
               fastqFile_2 << quality << "\n" ;
               ++globalId ;
             }
-            
+
           }
 
         }else{
@@ -109,7 +124,7 @@ void createFastqFiles(std::string fastaFile,
 
       }
     }
-
+endIt:
     if(!isPairedEnd){
       fastqFile.close() ;
     }else{
@@ -126,6 +141,7 @@ int main(int argc, char* argv[]){
 
   //options for creating the required files
   uint32_t readLen{31} ;
+  size_t fileSize{1000} ;
   std::string outdir ;
   std::string fastaFile ;
   bool isPairedEnd{false} ;
@@ -153,6 +169,9 @@ int main(int argc, char* argv[]){
   fastaqApp
     ->add_option("-r,--read-len", readLen,"read length") ;
 
+  fastaqApp
+    ->add_option("-n,--numofline", fileSize,"num of line in fastq") ;
+
   try{
     app.parse(argc,argv) ;
   } catch (const CLI::ParseError& e){
@@ -161,7 +180,7 @@ int main(int argc, char* argv[]){
   }
 
   if(app.got_subcommand(fastaqApp)){
-    createFastqFiles(fastaFile, outdir, isPairedEnd, readLen, ignoreShortSeq) ;
+    createFastqFiles(fastaFile, outdir, isPairedEnd, readLen, ignoreShortSeq, fileSize) ;
   }else{
     std::cerr << "wrong subcommand\n" ;
   }
